@@ -1,0 +1,89 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: orchestra
+      POSTGRES_PASSWORD: orchestra
+      POSTGRES_DB: orchestra
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestra"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  master:
+    build: ./master
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://orchestra:orchestra@postgres:5432/orchestra
+      REDIS_URL: redis://redis:6379
+      HEARTBEAT_TIMEOUT_MS: 15000
+      HEARTBEAT_SWEEP_INTERVAL_MS: 5000
+      DASHBOARD_ORIGIN: "*"
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}
+      AUTH_OPTIONAL: ${AUTH_OPTIONAL:-false}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      GLOBAL_RATE_LIMIT_WINDOW_MS: 60000
+      GLOBAL_RATE_LIMIT_MAX: 300
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: ./worker
+    environment:
+      MASTER_URL: http://master:4000
+      REDIS_URL: redis://redis:6379
+      CONCURRENCY: 2
+      HEARTBEAT_INTERVAL_MS: 5000
+      SSH_KEY_DIR: /keys
+    depends_on:
+      - master
+    volumes:
+      - ./keys:/keys:ro
+    # Scale this service to add more worker nodes to the fleet:
+    #   docker compose up --build -d --scale worker=3
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_ORCHESTRA_API_URL: ${NEXT_PUBLIC_ORCHESTRA_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_ORCHESTRA_SOCKET_URL: ${NEXT_PUBLIC_ORCHESTRA_SOCKET_URL:-http://localhost:4000}
+        CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+        RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+    ports:
+      - "3000:3000"
+    environment:
+      ORCHESTRA_API_URL: http://master:4000
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+    depends_on:
+      - master
+
+volumes:
+  pgdata:

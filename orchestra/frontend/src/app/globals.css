@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Orchestra "control room" theme: near-black slate background, cool
+  blue-indigo accent for active/primary actions, and a status palette
+  (success/warning/destructive) used consistently for step + run states
+  across the DAG view, fleet table, and badges.
+*/
+@layer base {
+  :root {
+    --background: 222 28% 6%;
+    --foreground: 220 14% 92%;
+
+    --card: 222 22% 9%;
+    --card-foreground: 220 14% 92%;
+
+    --popover: 222 22% 9%;
+    --popover-foreground: 220 14% 92%;
+
+    --primary: 228 100% 69%;
+    --primary-foreground: 222 28% 6%;
+
+    --secondary: 222 18% 14%;
+    --secondary-foreground: 220 14% 92%;
+
+    --muted: 222 18% 13%;
+    --muted-foreground: 220 13% 60%;
+
+    --accent: 222 20% 15%;
+    --accent-foreground: 220 14% 92%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 220 14% 96%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 222 28% 6%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 28% 6%;
+
+    --border: 222 17% 17%;
+    --input: 222 17% 17%;
+    --ring: 228 100% 69%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+/* Pulsing dot used for "running" steps and "online" workers */
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.55); }
+  70% { box-shadow: 0 0 0 6px hsl(var(--primary) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+}
+.pulse-dot {
+  animation: pulse-ring 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Vertical connector rail between DAG stages */
+.dag-rail {
+  background: repeating-linear-gradient(
+    to bottom,
+    hsl(var(--border)) 0px,
+    hsl(var(--border)) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}

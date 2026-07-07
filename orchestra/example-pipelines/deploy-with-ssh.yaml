@@ -1,0 +1,38 @@
+# Demonstrates the "config management / remote execution" side of Orchestra:
+# steps run over SSH against a target host, with an optional Ansible-style
+# "check" (dry-run) mode that reports what would happen without making changes.
+#
+# Replace host.hostname / host.username / host.privateKeyPath with a real
+# target. privateKeyPath is resolved relative to SSH_KEY_DIR on the worker
+# (default /keys, see docker-compose.yml).
+
+name: config-push
+steps:
+  - id: check-disk-space
+    name: Check disk space (dry run)
+    command: "df -h /"
+    host:
+      hostname: 203.0.113.10
+      username: ubuntu
+      privateKeyPath: id_rsa
+      check: true   # check mode: logs the command but does not execute it
+
+  - id: update-packages
+    name: Update package index
+    command: "sudo apt-get update -y"
+    host:
+      hostname: 203.0.113.10
+      username: ubuntu
+      privateKeyPath: id_rsa
+    depends_on: [check-disk-space]
+    max_attempts: 2
+    backoff_ms: 5000
+
+  - id: deploy-config
+    name: Push application config
+    command: "echo 'APP_ENV=production' | sudo tee /etc/myapp/.env && sudo systemctl restart myapp"
+    host:
+      hostname: 203.0.113.10
+      username: ubuntu
+      privateKeyPath: id_rsa
+    depends_on: [update-packages]

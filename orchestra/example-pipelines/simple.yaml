@@ -1,0 +1,51 @@
+# A small DAG that exercises parallel execution, dependency fan-in, and
+# automatic retries with exponential backoff.
+#
+#        checkout
+#        /      \
+#   install     lint
+#      |          \
+#    test          \
+#       \           \
+#        \--------- build
+#                       |
+#                    flaky-deploy (retries a couple of times before passing)
+
+name: simple-ci-pipeline
+steps:
+  - id: checkout
+    name: Checkout code
+    command: "echo 'Cloning repository...' && sleep 1 && echo 'Checked out commit abc123'"
+
+  - id: install
+    name: Install dependencies
+    command: "echo 'Installing dependencies...' && sleep 2 && echo 'Dependencies installed'"
+    depends_on: [checkout]
+
+  - id: lint
+    name: Lint
+    command: "echo 'Running linter...' && sleep 1 && echo 'Lint passed'"
+    depends_on: [checkout]
+
+  - id: test
+    name: Run tests
+    command: "echo 'Running test suite...' && sleep 2 && echo 'All tests passed'"
+    depends_on: [install]
+
+  - id: build
+    name: Build artifact
+    command: "echo 'Building artifact...' && sleep 2 && echo 'Build complete'"
+    depends_on: [test, lint]
+
+  - id: flaky-deploy
+    name: Deploy (simulated flaky step)
+    # Fails on the first two attempts, then succeeds - demonstrates
+    # BullMQ's exponential-backoff retry + step status -> "queued" -> "success".
+    command: >
+      test -f /tmp/orchestra-flaky-count || echo 0 > /tmp/orchestra-flaky-count;
+      COUNT=$(cat /tmp/orchestra-flaky-count);
+      echo $((COUNT + 1)) > /tmp/orchestra-flaky-count;
+      if [ "$COUNT" -lt 2 ]; then echo "deploy failed (attempt $((COUNT + 1)))"; exit 1; else echo "deploy succeeded"; rm -f /tmp/orchestra-flaky-count; fi
+    depends_on: [build]
+    max_attempts: 4
+    backoff_ms: 1000
