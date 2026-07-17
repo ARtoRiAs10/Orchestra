@@ -45,6 +45,15 @@ services:
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
       GLOBAL_RATE_LIMIT_WINDOW_MS: 60000
       GLOBAL_RATE_LIMIT_MAX: 300
+      # Needed so Clerk accepts session tokens issued to the frontend's real
+      # browser-facing origin (not just localhost:3000). In GitHub Codespaces,
+      # CODESPACE_NAME / GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN are already
+      # present in the shell `docker compose up` runs from, so this passes
+      # them straight through — no manual URL to copy-paste per codespace.
+      FRONTEND_URL: ${FRONTEND_URL:-}
+      CODESPACE_NAME: ${CODESPACE_NAME:-}
+      GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: ${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}
+      ORCHESTRA_EXTRA_AUTHORIZED_PARTIES: ${ORCHESTRA_EXTRA_AUTHORIZED_PARTIES:-}
     depends_on:
       postgres:
         condition: service_healthy

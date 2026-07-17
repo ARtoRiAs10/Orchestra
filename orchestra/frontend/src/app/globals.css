@@ -3,48 +3,58 @@
 @tailwind utilities;
 
 /*
-  Orchestra "control room" theme: near-black slate background, cool
-  blue-indigo accent for active/primary actions, and a status palette
-  (success/warning/destructive) used consistently for step + run states
-  across the DAG view, fleet table, and badges.
+  Orchestra "console" theme: clean, light workspace (à la AWS/GCP consoles)
+  paired with a dark, fixed left rail (à la Jenkins/AWS nav). Status colors
+  are kept saturated and distinct so pipeline/run/step state is scannable
+  at a glance across the DAG view, fleet table, and badges.
 */
 @layer base {
   :root {
-    --background: 222 28% 6%;
-    --foreground: 220 14% 92%;
+    --background: 210 20% 98%;
+    --foreground: 222 30% 14%;
 
-    --card: 222 22% 9%;
-    --card-foreground: 220 14% 92%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 30% 14%;
 
-    --popover: 222 22% 9%;
-    --popover-foreground: 220 14% 92%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 30% 14%;
 
-    --primary: 228 100% 69%;
-    --primary-foreground: 222 28% 6%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 222 18% 14%;
-    --secondary-foreground: 220 14% 92%;
+    --secondary: 210 20% 95%;
+    --secondary-foreground: 222 30% 20%;
 
-    --muted: 222 18% 13%;
-    --muted-foreground: 220 13% 60%;
+    --muted: 210 17% 95%;
+    --muted-foreground: 215 14% 44%;
 
-    --accent: 222 20% 15%;
-    --accent-foreground: 220 14% 92%;
+    --accent: 210 30% 94%;
+    --accent-foreground: 222 30% 16%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 220 14% 96%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142 71% 45%;
-    --success-foreground: 222 28% 6%;
+    --success: 142 65% 32%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 28% 6%;
+    --warning: 32 95% 44%;
+    --warning-foreground: 0 0% 100%;
 
-    --border: 222 17% 17%;
-    --input: 222 17% 17%;
-    --ring: 228 100% 69%;
+    --border: 216 16% 89%;
+    --input: 216 16% 87%;
+    --ring: 221 83% 53%;
 
     --radius: 0.5rem;
+
+    /* Fixed dark left rail — intentionally independent of --card/--background
+       so navigation reads as a distinct "console shell" around light content,
+       matching the Jenkins/AWS-console pattern. */
+    --sidebar-bg: 222 32% 12%;
+    --sidebar-foreground: 216 15% 80%;
+    --sidebar-muted: 217 12% 60%;
+    --sidebar-active-bg: 221 83% 53%;
+    --sidebar-active-foreground: 0 0% 100%;
+    --sidebar-border: 222 25% 20%;
   }
 }
 

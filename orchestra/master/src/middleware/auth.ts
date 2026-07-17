@@ -113,15 +113,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     // Verify the Clerk session JWT.
     // authorizedParties tells Clerk which frontend origins are allowed to
-    // have issued this token — without this, Clerk rejects tokens from
-    // localhost:3000 with "Invalid JWT: azp claim not authorized".
+    // have issued this token — without this, Clerk rejects tokens with
+    // "Invalid JWT: azp claim not authorized". This must include whatever
+    // origin the browser actually loads the frontend from — for GitHub
+    // Codespaces that's the forwarded https://<codespace>-3000.app.github.dev
+    // URL, NOT http://localhost:3000. See config.ts for how this list is
+    // built (FRONTEND_URL / ORCHESTRA_EXTRA_AUTHORIZED_PARTIES env vars).
     const verified = await verifyToken(token, {
       secretKey: config.clerkSecretKey,
-      authorizedParties: [
-        config.frontendUrl,
-        'http://localhost:3000',
-        'https://curly-happiness-g9rg5gpqx59cwq9x-3000.app.github.dev',
-      ],
+      authorizedParties: config.authorizedParties,
     });
 
     const userId = verified.sub;
