@@ -37,6 +37,41 @@ export function parsePipelineYaml(rawYaml: string): PipelineDef {
     const dependsOn = raw.depends_on
       ? (Array.isArray(raw.depends_on) ? raw.depends_on : [raw.depends_on])
       : [];
+    if (dependsOn.some((dep: unknown) => typeof dep !== 'string' || !dep.trim())) {
+      throw new PipelineValidationError(`steps[${idx}] ("${raw.id}") has a non-string depends_on entry`);
+    }
+
+    if (raw.host !== undefined) {
+      if (!raw.host || typeof raw.host !== 'object' || Array.isArray(raw.host)) {
+        throw new PipelineValidationError(`steps[${idx}] ("${raw.id}") "host" must be a mapping`);
+      }
+      const host = raw.host as Record<string, unknown>;
+      if (typeof host.hostname !== 'string' || !host.hostname.trim()) {
+        throw new PipelineValidationError(`steps[${idx}] ("${raw.id}") host.hostname is required`);
+      }
+      if (typeof host.username !== 'string' || !host.username.trim()) {
+        throw new PipelineValidationError(`steps[${idx}] ("${raw.id}") host.username is required`);
+      }
+      if (
+        host.port !== undefined &&
+        (typeof host.port !== 'number' || !Number.isInteger(host.port) || host.port < 1 || host.port > 65535)
+      ) {
+        throw new PipelineValidationError(`steps[${idx}] ("${raw.id}") host.port must be an integer between 1 and 65535`);
+      }
+    }
+
+    if (
+      raw.max_attempts !== undefined &&
+      (typeof raw.max_attempts !== 'number' || !Number.isInteger(raw.max_attempts) || raw.max_attempts < 1)
+    ) {
+      throw new PipelineValidationError(`steps[${idx}] ("${raw.id}") max_attempts must be a positive integer`);
+    }
+    if (
+      raw.backoff_ms !== undefined &&
+      (typeof raw.backoff_ms !== 'number' || !Number.isFinite(raw.backoff_ms) || raw.backoff_ms < 0)
+    ) {
+      throw new PipelineValidationError(`steps[${idx}] ("${raw.id}") backoff_ms must be a non-negative number`);
+    }
 
     return {
       id: raw.id,
@@ -46,7 +81,9 @@ export function parsePipelineYaml(rawYaml: string): PipelineDef {
       host: raw.host,
       max_attempts: typeof raw.max_attempts === 'number' ? raw.max_attempts : 3,
       backoff_ms: typeof raw.backoff_ms === 'number' ? raw.backoff_ms : 2000,
-      check: !!raw.check,
+      // Preserve "unset" so a host-level `check: true` in YAML is not
+      // overwritten by a default false at the step level.
+      check: typeof raw.check === 'boolean' ? raw.check : undefined,
     } as PipelineStepDef;
   });
 

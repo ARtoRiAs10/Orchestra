@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getRun, getSteps, getLogs } from '../services/runService';
+import { redactHost } from '../services/redact';
 
 export const runsRouter = Router();
 
@@ -13,7 +14,10 @@ runsRouter.get('/:id', async (req, res) => {
     return res.status(404).json({ error: 'Not found' });
   }
 
-  const steps = await getSteps(req.params.id);
+  const steps = (await getSteps(req.params.id)).map((step) => ({
+    ...step,
+    host: redactHost(step.host),
+  }));
   res.json({ ...run, steps });
 });
 

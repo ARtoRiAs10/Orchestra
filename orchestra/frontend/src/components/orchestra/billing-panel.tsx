@@ -64,16 +64,23 @@ export function BillingPanel({ initialSubscription }: { initialSubscription: Sub
         prefill: { email: user?.primaryEmailAddress?.emailAddress, name: user?.fullName ?? undefined },
         theme: { color: '#5b6cff' },
         handler: async () => {
-          // Webhook (server-to-server) activates the subscription; poll once
-          // it's likely processed and refresh the displayed plan.
-          setTimeout(async () => {
-            try {
+          // Webhook (server-to-server) activates the subscription. Poll a few
+          // times because the webhook may arrive after the browser callback.
+          try {
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+              await new Promise((resolve) => setTimeout(resolve, 2000));
               const updated = await apiFetch('/api/billing/subscription');
-              if (updated.ok) setSubscription(await updated.json());
-            } finally {
-              setLoadingPlan(null);
+              if (updated.ok) {
+                const data = await updated.json();
+                setSubscription(data);
+                if (data.plan === plan) break;
+              }
             }
-          }, 2000);
+          } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to refresh subscription');
+          } finally {
+            setLoadingPlan(null);
+          }
         },
         modal: { ondismiss: () => setLoadingPlan(null) },
       });

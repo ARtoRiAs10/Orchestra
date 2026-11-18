@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { plan } = (await req.json()) as { plan?: PlanTier };
-  if (!plan || !(plan in PLAN_PRICING)) {
+  if (!plan || !Object.prototype.hasOwnProperty.call(PLAN_PRICING, plan)) {
     return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
   }
 

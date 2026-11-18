@@ -21,7 +21,7 @@ async function main() {
   const worker = new Worker<JobPayload, JobResult>(
     QUEUE_NAME,
     async (job: Job<JobPayload>) => processJob(job, workerId),
-    { connection, concurrency: config.concurrency }
+    { connection, concurrency: config.concurrency, lockDuration: config.lockDurationMs }
   );
 
   worker.on('error', (err) => console.error('[worker] error', err));
@@ -63,16 +63,28 @@ async function processJob(job: Job<JobPayload>, workerId: string): Promise<JobRe
 
   log('system', `[worker ${workerId}] starting step "${stepId}" (attempt ${job.attemptsMade + 1}/${job.opts.attempts})`);
 
-  const target = host ? { ...host, check: check ?? host.check } : undefined;
-  const { exitCode } = target ? await runSSH(target, command, log) : await runLocal(command, log);
+  // Keep the BullMQ lock alive while a long-running command executes.
+  const lockExtension = setInterval(() => {
+    if (!job.token) return;
+    job.extendLock(job.token, config.lockDurationMs).catch((err) =>
+      console.warn('[worker] failed to extend job lock', err)
+    );
+  }, Math.max(5000, Math.floor(config.lockDurationMs / 3)));
 
-  if (exitCode === 0) {
-    log('system', `step "${stepId}" succeeded`);
-    return { status: 'success', exitCode, workerId };
+  try {
+    const target = host ? { ...host, check: check ?? host.check } : undefined;
+    const { exitCode } = target ? await runSSH(target, command, log) : await runLocal(command, log);
+
+    if (exitCode === 0) {
+      log('system', `step "${stepId}" succeeded`);
+      return { status: 'success', exitCode, workerId };
+    }
+
+    log('system', `step "${stepId}" failed with exit code ${exitCode}`);
+    throw new Error(JSON.stringify({ exitCode, workerId }));
+  } finally {
+    clearInterval(lockExtension);
   }
-
-  log('system', `step "${stepId}" failed with exit code ${exitCode}`);
-  throw new Error(JSON.stringify({ exitCode, workerId }));
 }
 
 main().catch((err) => {

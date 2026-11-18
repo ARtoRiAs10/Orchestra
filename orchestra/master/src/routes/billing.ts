@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import { config } from '../config';
-import { isPlanTier } from '../billing/plans';
+import { isPlanTier, PLAN_PRICING } from '../billing/plans';
 import {
   getSubscription,
   recordPendingOrder,
@@ -36,6 +36,9 @@ billingRouter.post('/orders', async (req, res) => {
     return res.status(400).json({ error: 'razorpayOrderId, plan, and amount are required' });
   }
   if (!isPlanTier(plan)) return res.status(400).json({ error: 'Invalid plan' });
+  if (amount !== PLAN_PRICING[plan]) {
+    return res.status(400).json({ error: 'Amount does not match the selected plan price' });
+  }
 
   try {
     await recordPendingOrder(req.userId, razorpayOrderId, plan, amount);

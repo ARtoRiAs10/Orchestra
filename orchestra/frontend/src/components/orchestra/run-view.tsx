@@ -10,7 +10,7 @@ import { StatusBadge } from '@/components/orchestra/status-badge';
 import { DagView } from '@/components/orchestra/dag-view';
 import { LogPanel } from '@/components/orchestra/log-panel';
 import { useOrchestraApi, ORCHESTRA_SOCKET_URL } from '@/lib/client-api';
-import type { Run, StepRow, LogLine } from '@/lib/types';
+import type { Run, RunStatus, StepRow, LogLine } from '@/lib/types';
 
 export function RunView({ runId, initialRun }: { runId: string; initialRun: Run }) {
   const { apiJson } = useOrchestraApi();
@@ -36,8 +36,12 @@ export function RunView({ runId, initialRun }: { runId: string; initialRun: Run 
 
     socket.on('connect', () => socket.emit('subscribe', runId));
 
-    socket.on('run-update', (payload: { steps?: StepRow[] }) => {
-      if (payload.steps) setRun((prev) => ({ ...prev, steps: payload.steps! }));
+    socket.on('run-update', (payload: { steps?: StepRow[]; runStatus?: RunStatus }) => {
+      setRun((prev) => ({
+        ...prev,
+        steps: payload.steps ?? prev.steps,
+        status: payload.runStatus ?? prev.status,
+      }));
     });
 
     socket.on('log', (line: LogLine) => {
@@ -55,8 +59,23 @@ export function RunView({ runId, initialRun }: { runId: string; initialRun: Run 
     };
   }, [runId]);
 
-  // Re-derive overall run status from latest step list, since the run row's
-  // own status only flips to its terminal value once every step is done.
+  // Socket updates can be missed during a reconnect, and some managed hosts
+  // buffer/proxy WebSockets. Poll as a fallback while the run is active.
+  useEffect(() => {
+    if (run.status !== 'running') return;
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await apiJson<Run>(`/api/runs/${runId}`);
+        setRun(fresh);
+      } catch {
+        /* transient polling failure - the socket will retry */
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [apiJson, runId, run.status]);
+
+  // The run row is the source of truth for the overall status; socket updates
+  // and polling keep it fresh while the run is active.
   const overallStatus = run.status;
 
   return (

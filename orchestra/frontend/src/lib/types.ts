@@ -38,13 +38,16 @@ export interface StepRow {
   finished_at: string | null;
 }
 
-export interface Run {
+export interface RunSummary {
   id: string;
   pipeline_id: string;
   status: RunStatus;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+}
+
+export interface Run extends RunSummary {
   steps: StepRow[];
 }
 

@@ -36,7 +36,7 @@
 //       res.status(401).json({ error: 'Missing Authorization bearer token' });
 //       return;
 //     }
-//     config.clerkSecretKey = "sk_test_ZcYrhi2kiBqTw3IVPY3p5EKBuATtSWXujYnTcTJcmf";
+//     config.clerkSecretKey = process.env.CLERK_SECRET_KEY as string;
 
 //     if (!config.clerkSecretKey) {
 //       res.status(500).json({ error: 'Server is missing CLERK_SECRET_KEY' });

@@ -42,6 +42,13 @@ export async function createRun(pipelineId: string, def: PipelineDef, ownerId?: 
       [runId, pipelineId, ownerId || null]
     );
     for (const step of def.steps) {
+      const host = step.host
+        ? JSON.stringify({
+            ...(step.host as unknown as Record<string, unknown>),
+            // Only override the host-level value when the step explicitly sets one.
+            ...(step.check !== undefined ? { check: step.check } : {}),
+          })
+        : null;
       await client.query(
         `INSERT INTO steps
            (id, run_id, step_id, name, command, depends_on, host, status, max_attempts, backoff_ms)
@@ -53,7 +60,7 @@ export async function createRun(pipelineId: string, def: PipelineDef, ownerId?: 
           step.name || step.id,
           step.command,
           step.depends_on || [],
-          step.host ? JSON.stringify({ ...step.host, check: step.check }) : null,
+          host,
           step.max_attempts ?? 3,
           step.backoff_ms ?? 2000,
         ]
@@ -127,6 +134,25 @@ export async function updateStepStatus(
   if (extra.finished_at) sets.push('finished_at = now()');
 
   await pool.query(`UPDATE steps SET ${sets.join(', ')} WHERE id = $1`, values);
+}
+
+export async function markStepRunning(stepDbId: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE steps
+        SET status = 'running', started_at = COALESCE(started_at, now())
+      WHERE id = $1 AND status IN ('queued', 'pending')`,
+    [stepDbId]
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+/** Atomically move a pending step to queued. Returns false if another scheduler already claimed it. */
+export async function claimStepForQueue(stepDbId: string): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `UPDATE steps SET status = 'queued' WHERE id = $1 AND status = 'pending' RETURNING id`,
+    [stepDbId]
+  );
+  return (rowCount ?? 0) > 0;
 }
 
 export async function updateRunStatus(

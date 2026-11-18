@@ -6,6 +6,7 @@ import { createRun, listRuns } from '../services/runService';
 import { scheduleRun } from '../dag';
 import { assertCanStartRun, PlanLimitError } from '../billing/billingService';
 import { perUserRateLimiter } from '../middleware/rateLimit';
+import { redactPipelineDefinition } from '../services/redact';
 
 export const pipelinesRouter = Router();
 
@@ -25,7 +26,7 @@ pipelinesRouter.post('/', async (req, res) => {
       `INSERT INTO pipelines (id, name, definition, owner_id) VALUES ($1, $2, $3, $4)`,
       [id, name || def.name, JSON.stringify(def), req.userId]
     );
-    return res.status(201).json({ id, name: name || def.name, definition: def });
+    return res.status(201).json({ id, name: name || def.name, definition: redactPipelineDefinition(def) });
   } catch (err) {
     if (err instanceof PipelineValidationError) {
       return res.status(400).json({ error: err.message });
@@ -42,7 +43,7 @@ pipelinesRouter.get('/', async (req, res) => {
     'SELECT id, name, definition, created_at FROM pipelines WHERE owner_id = $1 ORDER BY created_at DESC',
     [req.userId]
   );
-  res.json(rows);
+  res.json(rows.map((row) => ({ ...row, definition: redactPipelineDefinition(row.definition) })));
 });
 
 // Fetch a single pipeline (must be owned by the requesting user).
@@ -50,7 +51,7 @@ pipelinesRouter.get('/:id', async (req, res) => {
   if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
   const { rows } = await pool.query('SELECT * FROM pipelines WHERE id = $1 AND owner_id = $2', [req.params.id, req.userId]);
   if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
-  res.json(rows[0]);
+  res.json({ ...rows[0], definition: redactPipelineDefinition(rows[0].definition) });
 });
 
 // List runs for a pipeline owned by the requesting user.

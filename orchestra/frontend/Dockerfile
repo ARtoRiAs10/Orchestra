@@ -30,6 +30,9 @@ ENV RAZORPAY_KEY_SECRET=$RAZORPAY_KEY_SECRET
 COPY package*.json ./
 RUN npm install
 COPY . .
+# The repo has no committed public/ directory; Next.js still expects one in
+# the final image, and `COPY --from=build /app/public` fails if it is absent.
+RUN mkdir -p public
 RUN npm run build
 
 FROM node:20-alpine

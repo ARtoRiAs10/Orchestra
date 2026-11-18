@@ -39,6 +39,23 @@ export async function getSubscription(userId: string): Promise<SubscriptionView>
     status = rows[0].status;
     razorpaySubscriptionId = rows[0].razorpay_subscription_id;
     currentPeriodEnd = rows[0].current_period_end;
+
+    // Paid plans are sold as 30-day periods. Enforce expiry here (rather than
+    // relying on a cron job) so plan limits immediately fall back to Free once
+    // the paid period ends.
+    const periodEnd = rows[0].current_period_end ? new Date(rows[0].current_period_end) : null;
+    if (plan !== 'free' && periodEnd && periodEnd.getTime() <= Date.now()) {
+      plan = 'free';
+      status = 'inactive';
+      await pool.query(
+        `UPDATE subscriptions
+            SET plan = 'free', status = 'inactive', updated_at = now()
+          WHERE user_id = $1
+            AND plan <> 'free'
+            AND current_period_end = $2`,
+        [userId, rows[0].current_period_end]
+      );
+    }
   }
 
   const usage = await getUsage(userId);

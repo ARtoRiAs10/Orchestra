@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import Link from 'next/link';
 import { useOrchestraApi } from '@/lib/client-api';
 import type { Pipeline } from '@/lib/types';
 
@@ -139,16 +140,21 @@ export function PipelineList({ initialPipelines }: { initialPipelines: Pipeline[
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <GitBranch className="h-4 w-4 text-primary" />
-                  {p.name}
+                  <Link href={`/pipelines/${p.id}`} className="hover:text-primary hover:underline">
+                    {p.name}
+                  </Link>
                 </CardTitle>
                 <CardDescription>
                   {p.definition?.steps?.length ?? 0} steps · created {new Date(p.created_at).toLocaleString()}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex items-center gap-2">
                 <Button size="sm" onClick={() => triggerRun(p.id)} disabled={busy}>
                   <Play className="h-3.5 w-3.5" />
                   Run
+                </Button>
+                <Button size="sm" variant="outline" asChild>
+                  <Link href={`/pipelines/${p.id}`}>Details</Link>
                 </Button>
               </CardContent>
             </Card>

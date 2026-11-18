@@ -92,3 +92,11 @@ orchestra/
 > auth entirely during local development - every request is treated as a
 > single fixed dev user. Billing/Razorpay features won't work without real
 > keys, but pipelines/DAG/logs/fleet will.
+
+## Hosting
+
+Vercel can host the **Next.js frontend only** (`orchestra/frontend`). The
+master and worker are always-on Node/Socket.IO/BullMQ services and need a
+platform such as Render, Railway, Fly.io, or a VPS, plus managed Postgres and
+Redis. See [DEPLOYMENT.md](DEPLOYMENT.md) for the full Vercel setup and the
+required Clerk/CORS/webhook environment variables.

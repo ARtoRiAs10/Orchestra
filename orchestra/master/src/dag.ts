@@ -3,6 +3,9 @@ import { broadcastRunUpdate } from './socket';
 import {
   getSteps,
   getStepById,
+  getRun,
+  claimStepForQueue,
+  markStepRunning,
   updateStepStatus,
   updateRunStatus,
   StepRow,
@@ -45,9 +48,23 @@ export async function scheduleRun(runId: string): Promise<void> {
         statusMap.set(step.step_id, 'skipped');
         changed = true;
       } else if (allDepsSucceeded) {
-        await enqueueStep(runId, step);
-        await updateStepStatus(step.id, 'queued');
+        // Atomically claim the step before adding the job. This prevents two
+        // concurrent scheduleRun() calls from enqueuing the same step twice,
+        // and also avoids the "active" event racing with a later queued update.
+        const claimed = await claimStepForQueue(step.id);
         statusMap.set(step.step_id, 'queued');
+        if (!claimed) {
+          // Another scheduler already owns this step.
+          changed = true;
+          continue;
+        }
+        try {
+          await enqueueStep(runId, step);
+        } catch (err) {
+          console.error(`[dag] failed to enqueue step ${step.step_id} for run ${runId}`, err);
+          await updateStepStatus(step.id, 'failed', { finished_at: true });
+          statusMap.set(step.step_id, 'failed');
+        }
         changed = true;
       }
     }
@@ -63,7 +80,9 @@ export async function scheduleRun(runId: string): Promise<void> {
     await updateRunStatus(runId, anyFailed ? 'failed' : 'success', true);
   }
 
-  broadcastRunUpdate(runId, { steps: await getSteps(runId) });
+  const finalSteps = await getSteps(runId);
+  const run = await getRun(runId);
+  broadcastRunUpdate(runId, { steps: finalSteps, runStatus: run?.status });
 }
 
 async function enqueueStep(runId: string, step: StepRow): Promise<void> {
@@ -91,6 +110,29 @@ async function enqueueStep(runId: string, step: StepRow): Promise<void> {
  * step status updates + DAG re-evaluation. Call once at startup.
  */
 export function registerQueueListeners(): void {
+  // BullMQ emits "active" when a worker picks up a job. Persist the
+  // "running" state + start time so the dashboard reflects live execution
+  // instead of leaving steps on "queued" until they finish.
+  jobQueueEvents.on('active', async ({ jobId }) => {
+    try {
+      const step = await getStepById(jobId);
+      if (!step) return;
+
+      // Conditional update: never move a step backwards if it already
+      // completed/failed while this event was queued.
+      const marked = await markStepRunning(step.id);
+      if (!marked) return;
+
+      const run = await getRun(step.run_id);
+      broadcastRunUpdate(step.run_id, {
+        steps: await getSteps(step.run_id),
+        runStatus: run?.status ?? 'running',
+      });
+    } catch (err) {
+      console.error('[dag] error handling active job', jobId, err);
+    }
+  });
+
   jobQueueEvents.on('completed', async ({ jobId, returnvalue }: { jobId: string; returnvalue: unknown }) => {
     try {
       const result = parseResult(returnvalue);
